@@ -4,9 +4,9 @@ import polars as pl
 
 from database import parse_location
 from recommender_model import RecommenderMostReadBook, RecommenderBestRatedBookSum, RecommenderBestRatedBookMean, \
-    RecommenderCommonHistory, RecommenderClusters, RecommenderMostReadBookByCountry
+    RecommenderCommonHistory, RecommenderClusters, RecommenderMostReadBookByCountry, RecommenderSVD
 
-available_recommenders = [RecommenderCommonHistory, RecommenderMostReadBookByCountry, RecommenderClusters,
+available_recommenders = [RecommenderSVD, RecommenderCommonHistory, RecommenderMostReadBookByCountry, RecommenderClusters,
                           RecommenderMostReadBook, RecommenderBestRatedBookSum, RecommenderBestRatedBookMean]
 
 

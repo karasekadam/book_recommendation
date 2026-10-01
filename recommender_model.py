@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 
+
 import numpy as np
 from sklearn.cluster import KMeans
 from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import normalize
+from sklearn.metrics.pairwise import cosine_similarity
 
 import polars as pl
 
@@ -235,5 +237,112 @@ class RecommenderClusters(AbstractRecommender):
         return "Clusters Recommender"
 
 
+class RecommenderSVD(AbstractRecommender):
+    def __init__(self, train_df: pl.DataFrame | None = None):
+        super().__init__(train_df)
+        self.most_read_books = None
+        self.user_to_cluster = None
+        self.cluster_to_users = None
+        self.cluster_to_best_books = {}
+        self.user_embedding = None
+        self.users_to_id = None
+        self.id_to_users = None
+
+    def load(self):
+        users, rows = np.unique(self.train_df["User-ID"].to_numpy(), return_inverse=True)
+        self.users_to_id = {user_id: i for i, user_id in enumerate(users)}
+        self.id_to_users = {i: user_id for i, user_id in enumerate(users)}
+        books, cols = np.unique(self.train_df["ISBN"].to_numpy(), return_inverse=True)
+
+        # ignoring ratings by setting all read books to 1, all unread to 0
+        train_df = self.train_df.with_columns(
+            pl.lit(1).alias("Book-Rating")
+        )
+        ratings = train_df["Book-Rating"].to_numpy()
+
+        R = csr_matrix(
+            (ratings, (rows, cols)),
+            shape=(len(users), len(books))
+        )
+
+        # Normalize to popularity of item, reduce dimensions, and rescale values
+        R_tfidf = TfidfTransformer().fit_transform(R)
+        self.user_embedding = TruncatedSVD(n_components=50).fit_transform(R_tfidf)
+        self.user_embedding = normalize(self.user_embedding)
+
+    def predict(self, user: int):
+        user_history = set(self.train_df.filter(pl.col("User-ID") == user)["ISBN"])
+
+        # latent vector of one target user
+        target_user = self.user_embedding[self.users_to_id[user]].reshape(1, -1)
+
+        # similarity between the target user and every user
+        similarities = cosine_similarity(target_user, self.user_embedding)[0]
+        top50_sim_ids = np.argpartition(similarities, -50)[-50:]
+        top50_sim_users = set([self.id_to_users[i] for i in top50_sim_ids])
+        top50_users_ratings = self.train_df.filter(pl.col("User-ID").is_in(top50_sim_users))
+        top50_users_ratings = top50_users_ratings.filter(~pl.col("ISBN").is_in(user_history))
+        top50_users_books = top50_users_ratings.group_by("ISBN").len().sort("len", descending=True)
+        recommendations = top50_users_books["ISBN"].top_k(RECOMMENDED_NUMBER)
+
+        return list(recommendations)
+
+    def __str__(self):
+        return "Clusters Recommender"
+
+
+class RecommenderSVD_prediction(AbstractRecommender):
+    def __init__(self, train_df: pl.DataFrame | None = None):
+        super().__init__(train_df)
+        self.most_read_books = None
+        self.user_to_cluster = None
+        self.cluster_to_users = None
+        self.cluster_to_best_books = {}
+        self.user_embedding = None
+        self.users_to_id = None
+        self.id_to_users = None
+
+    def load(self):
+        users, rows = np.unique(self.train_df["User-ID"].to_numpy(), return_inverse=True)
+        self.users_to_id = {user_id: i for i, user_id in enumerate(users)}
+        self.id_to_users = {i: user_id for i, user_id in enumerate(users)}
+        books, cols = np.unique(self.train_df["ISBN"].to_numpy(), return_inverse=True)
+
+        # ignoring ratings by setting all read books to 1, all unread to 0
+        train_df = self.train_df.with_columns(
+            pl.lit(1).alias("Book-Rating")
+        )
+        ratings = train_df["Book-Rating"].to_numpy()
+
+        R = csr_matrix(
+            (ratings, (rows, cols)),
+            shape=(len(users), len(books))
+        )
+
+        # Normalize to popularity of item, reduce dimensions, and rescale values
+        R_tfidf = TfidfTransformer().fit_transform(R)
+        self.user_embedding = TruncatedSVD(n_components=50).fit_transform(R_tfidf)
+        self.user_embedding = normalize(self.user_embedding)
+
+
+    def predict(self, user: int):
+        user_history = set(self.train_df.filter(pl.col("User-ID") == user)["ISBN"])
+
+        # latent vector of one target user
+        target_user = self.user_embedding[self.users_to_id[user]].reshape(1, -1)
+
+        # similarity between the target user and every user
+        similarities = cosine_similarity(target_user, self.user_embedding)[0]
+        top50_sim_ids = np.argpartition(similarities, -50)[-50:]
+        top50_sim_users = set([self.id_to_users[i] for i in top50_sim_ids])
+        top50_users_ratings = self.train_df.filter(pl.col("User-ID").is_in(top50_sim_users))
+        top50_users_ratings = top50_users_ratings.filter(~pl.col("ISBN").is_in(user_history))
+        top50_users_books = top50_users_ratings.group_by("ISBN").len().sort("len", descending=True)
+        recommendations = top50_users_books["ISBN"].top_k(RECOMMENDED_NUMBER)
+
+        return list(recommendations)
+
+    def __str__(self):
+        return "Clusters Recommender"
 
 

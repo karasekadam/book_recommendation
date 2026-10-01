@@ -11,6 +11,7 @@ from recommender_model import (
     RecommenderClusters,
     RecommenderCommonHistory,
     RecommenderMostReadBook,
+    RecommenderSVD
 )
 
 app = Flask(__name__)
@@ -21,9 +22,10 @@ RECOMMENDER_CLASSES = {
     "best_rated_mean": RecommenderBestRatedBookMean,
     "common_history": RecommenderCommonHistory,
     "clusters": RecommenderClusters,
+    "SVD_cos_similarity": RecommenderSVD,
 }
 # models to reload after users submits their ratings
-RELOADABLE = ["common_history", "clusters"]
+RELOADABLE = ["common_history", "clusters", "SVD_cos_similarity"]
 
 
 def build_recommenders(names: list[str]) -> dict:
