@@ -123,7 +123,9 @@ class RecommenderCommonHistory(AbstractRecommender):
 
     def predict(self, user: int):
         user_history = self.train_df.filter(pl.col("User-ID") == user)
+        # number of books rated by each user
         books_by_user = self.train_df.group_by("User-ID").len()
+        # keep only ratings relevant to the target user
         ratings_df_reduced = self.train_df.filter(pl.col("User-ID") != user).filter(
             pl.col("ISBN").is_in(user_history["ISBN"]))
         recommended_books = []
@@ -144,6 +146,7 @@ class RecommenderCommonHistory(AbstractRecommender):
                 .otherwise(None)
                 .alias("Ratings_diff")
             )
+            # calculate the ratings similarity
             df_joined_agg = df_joined.group_by("User-ID").agg(
                 n_common=pl.len(),
                 ratings_similarity=1 - (pl.col("Ratings_diff").mean() / 9),
@@ -154,10 +157,12 @@ class RecommenderCommonHistory(AbstractRecommender):
             )
 
             df_joined_agg = df_joined_agg.join(books_by_user, on="User-ID", how="inner")
+            # Calculate same books read similarity
             df_joined_agg = df_joined_agg.with_columns(
                 (pl.col("n_common") / (pl.col("len") + len(user_history)))
                 .alias("n_common_norm")
             )
+            # Combine similarities
             df_joined_agg = df_joined_agg.with_columns(
                 (pl.col("n_common_norm") + pl.col("ratings_similarity"))
                 .alias("similarity_score")
@@ -193,6 +198,7 @@ class RecommenderClusters(AbstractRecommender):
         users, rows = np.unique(self.train_df["User-ID"].to_numpy(), return_inverse=True)
         books, cols = np.unique(self.train_df["ISBN"].to_numpy(), return_inverse=True)
 
+        # ignoring ratings by setting all read books to 1, all unread to 0
         train_df = self.train_df.with_columns(
             pl.lit(1).alias("Book-Rating")
         )
@@ -203,10 +209,12 @@ class RecommenderClusters(AbstractRecommender):
             shape=(len(users), len(books))
         )
 
-        R_tfidf = TfidfTransformer().fit_transform(R)  # still sparse
+        # Normalize to popularity of item, reduce dimensions, and rescale values
+        R_tfidf = TfidfTransformer().fit_transform(R)
         user_emb = TruncatedSVD(n_components=50).fit_transform(R_tfidf)
         user_emb = normalize(user_emb)
 
+        # calculate clusters
         kmeans = KMeans(n_clusters=50, n_init=10)
         clusters = kmeans.fit_predict(user_emb)
         self.user_to_cluster =  {user_id: cluster for user_id, cluster in zip(users, clusters)}
@@ -225,4 +233,7 @@ class RecommenderClusters(AbstractRecommender):
 
     def __str__(self):
         return "Clusters Recommender"
+
+
+
 

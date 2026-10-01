@@ -6,8 +6,8 @@ from database import parse_location
 from recommender_model import RecommenderMostReadBook, RecommenderBestRatedBookSum, RecommenderBestRatedBookMean, \
     RecommenderCommonHistory, RecommenderClusters, RecommenderMostReadBookByCountry
 
-available_recommenders = [RecommenderMostReadBookByCountry, RecommenderClusters, RecommenderMostReadBook, RecommenderBestRatedBookSum,
-                          RecommenderBestRatedBookMean, RecommenderCommonHistory]
+available_recommenders = [RecommenderCommonHistory, RecommenderMostReadBookByCountry, RecommenderClusters,
+                          RecommenderMostReadBook, RecommenderBestRatedBookSum, RecommenderBestRatedBookMean]
 
 
 def train_test_split(ratings_path: Path, user_paths: Path, test_size: float = 0.3) -> tuple[pl.DataFrame, pl.DataFrame]:
